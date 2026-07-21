@@ -24,13 +24,13 @@ compliance-fact family (ADR-2607141700,
 A **read-only reference/archive** catalog — not an Advisor⊣Governor
 actuation actor. It proposes or executes nothing on LIAJ's behalf.
 
-Coverage is reported honestly (see `association.facts/coverage`): an
-entry not in `catalog` has **no spec-basis**, full stop — never
+Coverage is reported honestly by the fail-closed exported Kotoba ABI: an
+association not explicitly admitted has **no spec-basis**, full stop — never
 fabricate one.
 
 ## Data
 
-- `src/association/facts.cljc` — the catalog, source of truth.
+- `src/association_facts.kotoba` — the sole production catalog authority.
 - `schema/association-rule.edn` — DataScript schema.
 - `data/datascript-tx.edn` — derived DataScript tx-data (query this
   alongside other `cloud-itonami`/`etzhayyim` compliance-fact sources via
@@ -39,6 +39,12 @@ fabricate one.
 業務品質評価基準ガイドライン（A版） was verified by directly reading the
 source PDF's cover page (FY2026 edition, created 2026-02-26); the
 codes-of-conduct overview page was directly WebFetch-verified.
+
+The catalog compiles through `kotoba-lang/compiler` to the reference evaluator,
+restricted JavaScript, and typed WebAssembly. Clojure/JVM and Node are test and
+compiler hosts only; neither is production authority. Compatibility is checked
+by observable values, typed ABI, empty effects, bounds, and fail-closed
+rejections—not compiler-output byte identity.
 
 ## License
 
