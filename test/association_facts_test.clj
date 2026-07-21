@@ -1,0 +1,51 @@
+(ns association-facts-test
+  (:require [clojure.java.io :as io] [clojure.java.shell :as shell]
+            [clojure.test :refer [deftest is testing]]
+            [kotoba.compiler.core :as compiler] [kotoba.compiler.ir :as ir]))
+(def source (slurp "src/association_facts.kotoba"))
+(defn call [kir f & xs] (ir/execute kir f (vec xs)))
+(defn present [x] (when (second x) (nth x 2)))
+(def fields ["id" "title" "association" "isic" "country" "kind" "url" "url-provenance"
+             "established-date" "last-revised-date" "retrieved-at"])
+(def expected
+  [{"id" "seiho.conduct-guidelines-overview"
+    "title" "行動規範・指針・自主ガイドライン等 (Codes of Conduct, Directives, and Voluntary Guidelines)"
+    "association" "seiho" "isic" "6511" "country" "JPN" "kind" "governance-program"
+    "url" "https://www.seiho.or.jp/activity/guideline/" "url-provenance" "official-association-site"
+    "established-date" nil "last-revised-date" nil "retrieved-at" "2026-07-15"}
+   {"id" "seiho.business-quality-assessment-guideline-a"
+    "title" "業務品質評価基準ガイドライン（A版） (Business Quality Assessment Standards Guideline, Version A)"
+    "association" "seiho" "isic" "6511" "country" "JPN" "kind" "self-regulatory-code"
+    "url" "https://www.seiho.or.jp/quality/pdf/guideline.pdf" "url-provenance" "official-association-site"
+    "established-date" nil "last-revised-date" "2026-02-26" "retrieved-at" "2026-07-15"}])
+(deftest reference-preserves-authority
+  (let [kir (:kir (compiler/compile-source source :js-kotoba-v1))
+        observed (mapv (fn [i] (into {} (map (fn [f] [f (present (call kir 'entry-field "seiho" i f))]) fields))) [0 1])]
+    (is (= expected observed))
+    (is (= [[nil nil] [nil "2026-02-26"]]
+           (mapv (fn [i] (mapv #(present (call kir 'entry-field "seiho" i %)) ["established-date" "last-revised-date"])) [0 1])))
+    (is (= [["governance" "member-conduct"] ["consumer-protection" "sales-quality"]]
+           (mapv (fn [i] (mapv #(present (call kir 'topic "seiho" i %)) (range (call kir 'topic-count "seiho" i)))) [0 1])))
+    (is (= "seiho.business-quality-assessment-guideline-a"
+           (present (call kir 'by-topic-id "seiho" "sales-quality" 0))))
+    (is (= #{} (set (:effects kir))))
+    (testing "fail closed"
+      (is (zero? (call kir 'entry-count "life-insurance-association-of-japan")))
+      (is (zero? (call kir 'entry-count "keidanren")))
+      (is (nil? (present (call kir 'entry-field "seiho" 2 "id"))))
+      (is (nil? (present (call kir 'entry-field "seiho" 0 "last-revised-date"))))
+      (is (nil? (present (call kir 'topic "seiho" 1 2))))
+      (is (zero? (call kir 'by-topic-count "seiho" "labor")))
+      (is (nil? (present (call kir 'by-topic-id "seiho" "governance" 1)))))))
+(defn compiler-root [] (nth (iterate #(.getParent ^java.nio.file.Path %)
+  (java.nio.file.Path/of (.toURI (io/resource "kotoba/compiler/core.clj")))) 4))
+(defn base64 [x] (.encodeToString (java.util.Base64/getEncoder) x))
+(deftest restricted-js-and-wasm-conform-semantically
+  (let [js (compiler/compile-source source :js-kotoba-v1) wasm (compiler/compile-source source :wasm32-browser-kotoba-v1)
+        js64 (base64 (.getBytes ^String (:source js) "UTF-8")) wasm64 (base64 ^bytes (:bytes wasm))
+        p (shell/sh "node" "--input-type=module" "-e"
+            (str "import(process.argv[1]).then(async h=>{const j=await import('data:text/javascript;base64," js64 "');const w=await h.instantiateKotoba(Buffer.from(process.argv[2],'base64'));const r=x=>{if(x['entry-field']('seiho',0n,'established-date')[1]!==false||x['entry-field']('seiho',0n,'last-revised-date')[1]!==false||x['entry-field']('seiho',1n,'last-revised-date')[2]!=='2026-02-26')throw Error('dates');if(x['by-topic-id']('seiho','sales-quality',0n)[2]!=='seiho.business-quality-assessment-guideline-a'||x['entry-count']('life-insurance-association-of-japan')!==0n||x['entry-count']('keidanren')!==0n)throw Error('authority');};r(j.instantiateKotoba({}));r(w.instance.exports)}).catch(e=>{console.error(e);process.exit(99)})")
+            (.toString (.toUri (.resolve (compiler-root) "runtime/browser-host.mjs"))) wasm64)]
+    (is (zero? (:exit p)) (str (:out p) (:err p)))))
+(deftest production-source-authority
+  (is (= ["src/association_facts.kotoba"] (->> (file-seq (io/file "src")) (filter #(.isFile %)) (map str) sort vec))))

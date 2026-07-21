@@ -1,0 +1,58 @@
+(ns association-facts
+  (:export [main association-covered? entry-count entry-field topic-count topic by-topic-count by-topic-id]))
+(defn association-covered? [a :string] :i64 (string=? a "seiho"))
+(defn entry-count [a :string] :i64 (if (association-covered? a) 2 0))
+(defn valid-entry? [a :string i :i64] :i64
+  (if (association-covered? a) (if (= i 0) 1 (if (= i 1) 1 0)) 0))
+(defn entry-field [a :string i :i64 f :string] [:option :string]
+  (if (valid-entry? a i)
+    (if (= i 0)
+      (cond
+        (string=? f "id") (option-some-of [:option :string] "seiho.conduct-guidelines-overview")
+        (string=? f "title") (option-some-of [:option :string] "行動規範・指針・自主ガイドライン等 (Codes of Conduct, Directives, and Voluntary Guidelines)")
+        (string=? f "association") (option-some-of [:option :string] "seiho")
+        (string=? f "isic") (option-some-of [:option :string] "6511")
+        (string=? f "country") (option-some-of [:option :string] "JPN")
+        (string=? f "kind") (option-some-of [:option :string] "governance-program")
+        (string=? f "url") (option-some-of [:option :string] "https://www.seiho.or.jp/activity/guideline/")
+        (string=? f "url-provenance") (option-some-of [:option :string] "official-association-site")
+        (string=? f "retrieved-at") (option-some-of [:option :string] "2026-07-15")
+        :else (option-none-of [:option :string]))
+      (cond
+        (string=? f "id") (option-some-of [:option :string] "seiho.business-quality-assessment-guideline-a")
+        (string=? f "title") (option-some-of [:option :string] "業務品質評価基準ガイドライン（A版） (Business Quality Assessment Standards Guideline, Version A)")
+        (string=? f "association") (option-some-of [:option :string] "seiho")
+        (string=? f "isic") (option-some-of [:option :string] "6511")
+        (string=? f "country") (option-some-of [:option :string] "JPN")
+        (string=? f "kind") (option-some-of [:option :string] "self-regulatory-code")
+        (string=? f "url") (option-some-of [:option :string] "https://www.seiho.or.jp/quality/pdf/guideline.pdf")
+        (string=? f "url-provenance") (option-some-of [:option :string] "official-association-site")
+        (string=? f "last-revised-date") (option-some-of [:option :string] "2026-02-26")
+        (string=? f "retrieved-at") (option-some-of [:option :string] "2026-07-15")
+        :else (option-none-of [:option :string])))
+    (option-none-of [:option :string])))
+(defn topic-count [a :string i :i64] :i64 (if (valid-entry? a i) 2 0))
+(defn topic [a :string i :i64 ti :i64] [:option :string]
+  (if (valid-entry? a i)
+    (if (= i 0)
+      (if (= ti 0) (option-some-of [:option :string] "governance")
+        (if (= ti 1) (option-some-of [:option :string] "member-conduct") (option-none-of [:option :string])))
+      (if (= ti 0) (option-some-of [:option :string] "consumer-protection")
+        (if (= ti 1) (option-some-of [:option :string] "sales-quality") (option-none-of [:option :string]))))
+    (option-none-of [:option :string])))
+(defn by-topic-count [a :string t :string] :i64
+  (if (association-covered? a)
+    (if (string=? t "governance") 1
+      (if (string=? t "member-conduct") 1
+        (if (string=? t "consumer-protection") 1 (if (string=? t "sales-quality") 1 0))))
+    0))
+(defn by-topic-id [a :string t :string i :i64] [:option :string]
+  (if (association-covered? a)
+    (if (= i 0)
+      (if (string=? t "governance") (entry-field a 0 "id")
+        (if (string=? t "member-conduct") (entry-field a 0 "id")
+          (if (string=? t "consumer-protection") (entry-field a 1 "id")
+            (if (string=? t "sales-quality") (entry-field a 1 "id") (option-none-of [:option :string])))))
+      (option-none-of [:option :string]))
+    (option-none-of [:option :string])))
+(defn main [] :i64 0)
